@@ -160,8 +160,16 @@ export default function SettingsPage() {
   };
 
   const handleClearSignals = () => {
-    if (window.confirm("Clear all signal history? This cannot be undone.")) {
-      alert("Signal queue cleared. (Connected to Supabase when configured.)");
+    if (window.confirm("Clear all signals? This cannot be undone.")) {
+      localStorage.removeItem("pip_signals");
+      window.dispatchEvent(new Event("storage"));
+    }
+  };
+
+  const handleResetAllData = () => {
+    if (window.confirm("Reset all app data? This will clear the pipeline, signals, and outreach history. This cannot be undone.")) {
+      ["pip_pipeline","pip_signals","pip_outreach_history"].forEach(k => localStorage.removeItem(k));
+      alert("All data cleared. Reload the page to see an empty state.");
     }
   };
 
@@ -374,6 +382,21 @@ export default function SettingsPage() {
                     <div className="text-left">
                       <p className="text-sm font-medium text-red-700">Clear signal queue</p>
                       <p className="text-xs text-red-400">Remove all cached signal history</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-red-300 group-hover:text-red-500 transition" />
+                </button>
+                <button
+                  onClick={handleResetAllData}
+                  className="w-full card card-hover p-4 flex items-center justify-between group border-red-100 hover:border-red-200 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center">
+                      <Trash2 size={14} className="text-red-500" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-red-700">Reset all data to empty</p>
+                      <p className="text-xs text-red-400">Clears pipeline, signals, and outreach history — start fresh</p>
                     </div>
                   </div>
                   <ChevronRight size={16} className="text-red-300 group-hover:text-red-500 transition" />
