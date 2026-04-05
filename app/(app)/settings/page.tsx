@@ -25,6 +25,13 @@ interface AppSettings {
   anthropicKey: string;
   zillowKey: string;
   mlsKey: string;
+  // Scrapers
+  newsApiKey: string;
+  zillowApiKey: string;
+  proxycurlApiKey: string;
+  minTransactionThreshold: number;
+  targetMarkets: string[];
+  scrubFrequency: "daily" | "weekly" | "manual";
   // Notifications
   hotSignalAlert: "email" | "inapp" | "off";
   weeklyDigest: boolean;
@@ -48,6 +55,12 @@ const DEFAULTS: AppSettings = {
   anthropicKey: "",
   zillowKey: "",
   mlsKey: "",
+  newsApiKey: "",
+  zillowApiKey: "",
+  proxycurlApiKey: "",
+  minTransactionThreshold: 10_000_000,
+  targetMarkets: ["Los Angeles", "New York", "San Francisco", "Aspen", "Miami"],
+  scrubFrequency: "weekly",
   hotSignalAlert: "inapp",
   weeklyDigest: true,
   newLeadNotif: true,
@@ -98,11 +111,12 @@ function MaskedInput({
 }
 
 const TABS = [
-  { id: "email",  label: "Email",         icon: Mail },
-  { id: "api",    label: "API Keys",       icon: Key },
-  { id: "notifs", label: "Notifications",  icon: Bell },
-  { id: "profile",label: "Profile",        icon: User },
-  { id: "data",   label: "Data",           icon: Database },
+  { id: "email",   label: "Email",         icon: Mail },
+  { id: "api",     label: "API Keys",       icon: Key },
+  { id: "scrapers",label: "Scrapers",       icon: Database },
+  { id: "notifs",  label: "Notifications",  icon: Bell },
+  { id: "profile", label: "Profile",        icon: User },
+  { id: "data",    label: "Data",           icon: Database },
 ];
 
 function SectionHeader({ title, desc }: { title: string; desc: string }) {
@@ -263,6 +277,75 @@ export default function SettingsPage() {
               <p className="text-xs text-[#9B958F]">
                 All API keys are stored locally in your browser and never transmitted to any server. When Supabase is configured, keys can be stored encrypted in your account.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Scrapers ─────────────────────────────────────────────── */}
+        {activeTab === "scrapers" && (
+          <div className="space-y-4">
+            <div className="card p-6">
+              <SectionHeader title="Intelligence Scraper Keys" desc="API keys for automated signal gathering. All keys stored locally and never sent to any server." />
+              <FieldRow label="NewsAPI.org key" hint="Daily news monitoring — free tier (100 req/day). Get key at newsapi.org">
+                <MaskedInput value={settings.newsApiKey} onChange={v => set("newsApiKey", v)} placeholder="news-api-••••••••" />
+              </FieldRow>
+              <FieldRow label="Zillow / RapidAPI key" hint="$10M+ MLS closing data across target markets. Get key at rapidapi.com/apimaker/api/zillow56">
+                <MaskedInput value={settings.zillowApiKey} onChange={v => set("zillowApiKey", v)} placeholder="rapidapi-••••••••" />
+              </FieldRow>
+              <FieldRow label="Proxycurl key" hint="LinkedIn agent monitoring — $0.01/profile. Get key at nubela.co/proxycurl">
+                <MaskedInput value={settings.proxycurlApiKey} onChange={v => set("proxycurlApiKey", v)} placeholder="proxycurl-••••••••" />
+              </FieldRow>
+            </div>
+
+            <div className="card p-6">
+              <SectionHeader title="Scraper Configuration" desc="Control which markets and transaction sizes to monitor." />
+              <FieldRow label="Minimum transaction" hint="Only surface deals above this threshold">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9B958F] text-sm">$</span>
+                  <input
+                    type="number"
+                    min={1_000_000}
+                    step={1_000_000}
+                    value={settings.minTransactionThreshold}
+                    onChange={e => set("minTransactionThreshold", Number(e.target.value))}
+                    className="input-base text-sm pl-7"
+                  />
+                </div>
+              </FieldRow>
+              <FieldRow label="Scrub frequency" hint="How often automated cron runs the full scrub">
+                <div className="flex gap-2">
+                  {(["daily","weekly","manual"] as const).map(f => (
+                    <button key={f} onClick={() => set("scrubFrequency", f)} className={`flex-1 py-2 text-xs rounded-lg border font-medium capitalize transition-all ${settings.scrubFrequency === f ? "bg-[#1E2761] text-white border-[#1E2761]" : "bg-white border-[#E0D8CC] text-[#5A534E] hover:border-[#C9A96E]"}`}>
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </FieldRow>
+              <FieldRow label="Target markets" hint="Cities to monitor for luxury agent activity and MLS closings">
+                <div className="flex flex-wrap gap-2">
+                  {["Los Angeles","New York","San Francisco","Aspen","Miami","Seattle","Chicago","Boston","Dallas"].map(m => {
+                    const selected = settings.targetMarkets.includes(m);
+                    return (
+                      <button
+                        key={m}
+                        onClick={() => set("targetMarkets", selected ? settings.targetMarkets.filter(x => x !== m) : [...settings.targetMarkets, m])}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${selected ? "bg-[#1E2761] text-white border-[#1E2761]" : "bg-white border-[#E0D8CC] text-[#5A534E] hover:border-[#C9A96E]"}`}
+                      >
+                        {m}
+                      </button>
+                    );
+                  })}
+                </div>
+              </FieldRow>
+            </div>
+
+            <div className="card p-4 bg-[#FAFAF8]">
+              <p className="text-xs font-semibold text-[#5A534E] mb-2">Free sources (no key needed)</p>
+              <div className="grid grid-cols-2 gap-2 text-xs text-[#9B958F]">
+                <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />SEC EDGAR — IPO, Form 4, 13F filings</div>
+                <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Hawaii County Records (Honolulu open data)</div>
+              </div>
+              <p className="text-xs text-[#C2B9B0] mt-2">These run automatically on the weekly cron with no configuration needed.</p>
             </div>
           </div>
         )}

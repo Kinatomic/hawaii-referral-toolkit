@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Zap, Mail, Users, Settings, LogOut, MapPin } from "lucide-react";
+import { LayoutDashboard, Zap, Mail, Users, Settings, LogOut, MapPin, BrainCircuit } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
 const navItems = [
-  { href: "/dashboard", label: "Pipeline", icon: LayoutDashboard },
-  { href: "/signals",   label: "Signals",  icon: Zap },
-  { href: "/outreach",  label: "Outreach", icon: Mail },
-  { href: "/leads",     label: "Leads",    icon: Users },
+  { href: "/dashboard",    label: "Pipeline",     icon: LayoutDashboard },
+  { href: "/signals",      label: "Signals",      icon: Zap },
+  { href: "/intelligence", label: "Intelligence", icon: BrainCircuit },
+  { href: "/outreach",     label: "Outreach",     icon: Mail },
+  { href: "/leads",        label: "Leads",        icon: Users },
 ];
 
 export default function Navigation() {

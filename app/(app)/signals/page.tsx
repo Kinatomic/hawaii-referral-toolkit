@@ -7,10 +7,12 @@ import {
 } from "recharts";
 import {
   Flame, Eye, TrendingUp, Lock, Send, Search, CheckCircle, Radio,
-  Plus, RefreshCw, X, Info, AlertTriangle,
+  Plus, RefreshCw, X, Info, AlertTriangle, Microscope, ExternalLink,
 } from "lucide-react";
 import { outreachQueue, velocityData } from "@/lib/data";
 import { useSignals, Signal } from "@/lib/useLocalData";
+import { SOURCE_COLORS, SOURCE_LABELS, SourceType } from "@/lib/scrapers";
+import type { ResearchReport } from "@/lib/scrapers";
 
 const GOLD = "#C9A96E";
 const PIE_DATA = [
@@ -32,6 +34,89 @@ function ScoreBar({ score }: { score: number }) {
 
 function DemoBadge() {
   return <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-500 border border-amber-200 ml-1.5">DEMO</span>;
+}
+
+function SourceBadge({ sourceType }: { sourceType?: SourceType }) {
+  if (!sourceType || sourceType === "manual") return null;
+  const cls = SOURCE_COLORS[sourceType] ?? SOURCE_COLORS.manual;
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ml-1.5 ${cls}`}>
+      {SOURCE_LABELS[sourceType]}
+    </span>
+  );
+}
+
+function ResearchModal({ report, onClose }: { report: ResearchReport; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl border border-[#EDE8E0] max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0EBE3] sticky top-0 bg-white">
+          <div>
+            <h2 className="text-sm font-semibold text-[#1A1615]">AI Research Report</h2>
+            <p className="text-xs text-[#9B958F] mt-0.5">{report.subject}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#9B958F]">Lead Score</span>
+              <span className={`text-lg font-bold ${report.lead_score >= 70 ? "text-red-600" : report.lead_score >= 50 ? "text-amber-600" : "text-blue-600"}`}>
+                {report.lead_score}
+              </span>
+              <span className="text-xs text-[#9B958F]">/ 100</span>
+            </div>
+            <button onClick={onClose} className="text-[#9B958F] hover:text-[#1A1615] transition"><X size={16} /></button>
+          </div>
+        </div>
+        <div className="p-6 space-y-5">
+          {report.lead_score_rationale && (
+            <p className="text-xs text-[#5A534E] italic border-l-2 border-[#C9A96E] pl-3">{report.lead_score_rationale}</p>
+          )}
+          {report.net_worth_estimate && (
+            <div>
+              <p className="text-xs font-semibold text-[#5A534E] mb-1">Net Worth Estimate</p>
+              <p className="text-sm text-[#1A1615]">{report.net_worth_estimate}</p>
+            </div>
+          )}
+          {report.liquidity_events.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-[#5A534E] mb-2">Liquidity Events</p>
+              <ul className="space-y-1">{report.liquidity_events.map((e, i) => (
+                <li key={i} className="text-sm text-[#5A534E] flex items-start gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0" />{e}</li>
+              ))}</ul>
+            </div>
+          )}
+          {report.hawaii_connections.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-[#5A534E] mb-2">Hawaii Connection Signals</p>
+              <ul className="space-y-1">{report.hawaii_connections.map((c, i) => (
+                <li key={i} className="text-sm text-[#5A534E] flex items-start gap-2"><span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 flex-shrink-0" />{c}</li>
+              ))}</ul>
+            </div>
+          )}
+          {report.recommended_approach && (
+            <div className="p-4 bg-[#FAFAF8] rounded-xl border border-[#EDE8E0]">
+              <p className="text-xs font-semibold text-[#5A534E] mb-1.5">Recommended Approach</p>
+              <p className="text-sm text-[#1A1615]">{report.recommended_approach}</p>
+            </div>
+          )}
+          {report.key_talking_points.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-[#5A534E] mb-2">Key Talking Points</p>
+              <ul className="space-y-1.5">{report.key_talking_points.map((p, i) => (
+                <li key={i} className="text-sm text-[#5A534E] flex items-start gap-2"><span className="text-[#C9A96E] font-bold">{i + 1}.</span>{p}</li>
+              ))}</ul>
+            </div>
+          )}
+          {report.raw_narrative && (
+            <div>
+              <p className="text-xs font-semibold text-[#5A534E] mb-2">Intelligence Brief</p>
+              <p className="text-sm text-[#5A534E] leading-relaxed whitespace-pre-wrap">{report.raw_narrative}</p>
+            </div>
+          )}
+          <p className="text-[10px] text-[#C2B9B0] text-right">Generated {new Date(report.generated_at).toLocaleString()}</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const SIGNAL_TABS = [
@@ -181,7 +266,7 @@ function AddSignalModal({ onSave, onClose }: { onSave: (s: Omit<Signal, "id" | "
 }
 
 export default function SignalsPage() {
-  const { signals, addSignal, clearDemo } = useSignals();
+  const { signals, addSignal, clearDemo, mergeScraperSignals } = useSignals();
   const [activeTab, setActiveTab] = useState("liquidity");
   const [search, setSearch] = useState("");
   const [pf, setPf] = useState("all");
@@ -189,6 +274,9 @@ export default function SignalsPage() {
   const [showInfo, setShowInfo] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [refreshPulse, setRefreshPulse] = useState(false);
+  const [researching, setResearching] = useState<number | null>(null);
+  const [researchReport, setResearchReport] = useState<ResearchReport | null>(null);
+  const [researchError, setResearchError] = useState<string | null>(null);
 
   const hasDemoSignals = signals.some(s => s.isDemo);
 
@@ -203,9 +291,53 @@ export default function SignalsPage() {
     count: t.id === "queue" ? outreachQueue.length : signals.filter(s => s.tab === t.id as Signal["tab"]).length,
   }));
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshPulse(true);
-    setTimeout(() => setRefreshPulse(false), 1200);
+    try {
+      const settings = typeof window !== "undefined"
+        ? JSON.parse(localStorage.getItem("pip_settings") ?? "null")
+        : null;
+      const res = await fetch("/api/cron/scrub", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sources: ["sec", "county"],
+          newsApiKey: settings?.newsApiKey,
+          minPrice: settings?.minTransactionThreshold ?? 10_000_000,
+          lookbackDays: 7,
+        }),
+      });
+      const data = await res.json();
+      if (data.signals?.length) mergeScraperSignals(data.signals);
+    } catch {}
+    finally { setRefreshPulse(false); }
+  };
+
+  const handleDeepResearch = async (signal: Signal) => {
+    const settings = typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("pip_settings") ?? "null")
+      : null;
+    if (!settings?.anthropicKey) {
+      setResearchError("Add an Anthropic API key in Settings → API Keys to use Deep Research.");
+      setResearchReport({ subject: signal.person ?? signal.signal ?? "Signal", liquidity_events: [], hawaii_connections: [], key_talking_points: [], recommended_approach: "", lead_score: 50, lead_score_rationale: "", raw_narrative: "", generated_at: new Date().toISOString() });
+      return;
+    }
+    setResearching(signal.id);
+    setResearchError(null);
+    try {
+      const res = await fetch("/api/research-agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ anthropicKey: settings.anthropicKey, signal, mode: "signal" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Research failed");
+      setResearchReport(data as ResearchReport);
+    } catch (e) {
+      setResearchError(e instanceof Error ? e.message : "Research failed");
+    } finally {
+      setResearching(null);
+    }
   };
 
   const liqRows = tabSignals("liquidity");
@@ -323,19 +455,29 @@ export default function SignalsPage() {
       <div className="card overflow-hidden">
         {activeTab === "liquidity" && (
           <table className="w-full text-sm">
-            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Signal","Person / Entity","Liquidity","Location","Known Agent","Priority","Action"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Signal","Person / Entity","Liquidity","Location","Known Agent","Priority","Action",""].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
             <tbody>
-              {liqRows.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-[#9B958F]">No liquidity signals found</td></tr>}
+              {liqRows.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-[#9B958F]">No liquidity signals found</td></tr>}
               {liqRows.map(row => { const key = `liq-${row.id}`; const done = contacted.has(key); return (
                 <tr key={row.id} className="border-b border-[#F5F3EF] hover:bg-[#FAFAF8] transition-colors">
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.date}</td>
-                  <td className="px-4 py-3 text-xs font-medium" style={{color:GOLD}}>{row.signal}{row.isDemo && <DemoBadge />}</td>
+                  <td className="px-4 py-3 text-xs font-medium" style={{color:GOLD}}>{row.signal}{row.isDemo && <DemoBadge />}<SourceBadge sourceType={row.source_type} /></td>
                   <td className="px-4 py-3 font-medium text-[#1A1615]">{row.person}</td>
                   <td className="px-4 py-3 font-bold text-emerald-700">{row.liquidity}</td>
                   <td className="px-4 py-3 text-[#5A534E]">{row.location}</td>
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.agent}</td>
                   <td className="px-4 py-3"><PriorityBadge p={row.priority} /></td>
                   <td className="px-4 py-3">{done ? <span className="flex items-center gap-1 text-xs text-emerald-600"><CheckCircle size={11} /> Done</span> : <button onClick={() => setContacted(p => new Set([...p, key]))} className="text-xs font-medium hover:underline" style={{color:GOLD}}>{row.action}</button>}</td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleDeepResearch(row)}
+                      disabled={researching === row.id}
+                      className="flex items-center gap-1 text-xs text-[#9B958F] hover:text-[#1E2761] transition disabled:opacity-50"
+                      title="Deep Research"
+                    >
+                      {researching === row.id ? <RefreshCw size={11} className="animate-spin" /> : <Microscope size={11} />}
+                    </button>
+                  </td>
                 </tr>
               );})}
             </tbody>
@@ -343,18 +485,19 @@ export default function SignalsPage() {
         )}
         {activeTab === "agents" && (
           <table className="w-full text-sm">
-            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Agent","Brokerage","Signal","Relevance","Score","Priority"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Agent","Brokerage","Signal","Relevance","Score","Priority",""].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
             <tbody>
-              {agentRows.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-[#9B958F]">No agent signals found</td></tr>}
+              {agentRows.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-[#9B958F]">No agent signals found</td></tr>}
               {agentRows.map(row => (
                 <tr key={row.id} className="border-b border-[#F5F3EF] hover:bg-[#FAFAF8] transition-colors">
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.date}</td>
-                  <td className="px-4 py-3 font-medium text-[#1A1615]">{row.agent}{row.isDemo && <DemoBadge />}</td>
+                  <td className="px-4 py-3 font-medium text-[#1A1615]">{row.agent}{row.isDemo && <DemoBadge />}<SourceBadge sourceType={row.source_type} /></td>
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.brokerage}</td>
                   <td className="px-4 py-3 text-[#5A534E] text-xs max-w-xs">{row.signal}</td>
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.relevance}</td>
                   <td className="px-4 py-3"><ScoreBar score={row.score ?? 0} /></td>
                   <td className="px-4 py-3"><PriorityBadge p={row.priority} /></td>
+                  <td className="px-4 py-3"><button onClick={() => handleDeepResearch(row)} disabled={researching === row.id} className="flex items-center gap-1 text-xs text-[#9B958F] hover:text-[#1E2761] transition disabled:opacity-50" title="Deep Research">{researching === row.id ? <RefreshCw size={11} className="animate-spin" /> : <Microscope size={11} />}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -362,20 +505,26 @@ export default function SignalsPage() {
         )}
         {activeTab === "market" && (
           <table className="w-full text-sm">
-            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Property","Price","Market","Agent","Brokerage","Network","Priority","Action"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Property","Price","Market","Agent","Brokerage","Network","Priority","Action",""].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
             <tbody>
-              {mktRows.length === 0 && <tr><td colSpan={9} className="px-4 py-8 text-center text-xs text-[#9B958F]">No market signals found</td></tr>}
+              {mktRows.length === 0 && <tr><td colSpan={10} className="px-4 py-8 text-center text-xs text-[#9B958F]">No market signals found</td></tr>}
               {mktRows.map(row => (
                 <tr key={row.id} className="border-b border-[#F5F3EF] hover:bg-[#FAFAF8] transition-colors">
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.date}</td>
-                  <td className="px-4 py-3 font-medium text-[#1A1615]">{row.property}{row.isDemo && <DemoBadge />}</td>
+                  <td className="px-4 py-3 font-medium text-[#1A1615]">{row.property}{row.isDemo && <DemoBadge />}<SourceBadge sourceType={row.source_type} /></td>
                   <td className="px-4 py-3 font-bold text-emerald-700">{row.price}</td>
                   <td className="px-4 py-3 text-[#5A534E]">{row.market}</td>
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.agent}</td>
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.brokerage}</td>
                   <td className="px-4 py-3">{row.inNetwork ? <span className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle size={11} /> In network</span> : <span className="text-xs text-[#C2B9B0]">Unknown</span>}</td>
                   <td className="px-4 py-3"><PriorityBadge p={row.priority} /></td>
-                  <td className="px-4 py-3 text-xs font-medium cursor-pointer hover:underline" style={{color:GOLD}}>{row.action}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium cursor-pointer hover:underline" style={{color:GOLD}}>{row.action}</span>
+                      {row.source_url && <a href={row.source_url} target="_blank" rel="noopener noreferrer" className="text-[#C2B9B0] hover:text-[#1E2761]"><ExternalLink size={11} /></a>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3"><button onClick={() => handleDeepResearch(row)} disabled={researching === row.id} className="flex items-center gap-1 text-xs text-[#9B958F] hover:text-[#1E2761] transition disabled:opacity-50" title="Deep Research">{researching === row.id ? <RefreshCw size={11} className="animate-spin" /> : <Microscope size={11} />}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -383,18 +532,19 @@ export default function SignalsPage() {
         )}
         {activeTab === "privacy" && (
           <table className="w-full text-sm">
-            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Type","Detail","Source","Fit Score","Priority","Action"].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
+            <thead><tr className="bg-[#F5F3EF] border-b border-[#EDE8E0]">{["Date","Type","Detail","Source","Fit Score","Priority","Action",""].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-[#5A534E]">{h}</th>)}</tr></thead>
             <tbody>
-              {privRows.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-[#9B958F]">No privacy seeker signals found</td></tr>}
+              {privRows.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-xs text-[#9B958F]">No privacy seeker signals found</td></tr>}
               {privRows.map(row => (
                 <tr key={row.id} className="border-b border-[#F5F3EF] hover:bg-[#FAFAF8] transition-colors">
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.date}</td>
-                  <td className="px-4 py-3 text-xs font-medium" style={{color:GOLD}}>{row.type}{row.isDemo && <DemoBadge />}</td>
+                  <td className="px-4 py-3 text-xs font-medium" style={{color:GOLD}}>{row.type}{row.isDemo && <DemoBadge />}<SourceBadge sourceType={row.source_type} /></td>
                   <td className="px-4 py-3 text-[#5A534E] text-xs max-w-xs">{row.detail}</td>
                   <td className="px-4 py-3 text-[#9B958F] text-xs">{row.source}</td>
                   <td className="px-4 py-3"><ScoreBar score={row.fitScore ?? 0} /></td>
                   <td className="px-4 py-3"><PriorityBadge p={row.priority} /></td>
                   <td className="px-4 py-3 text-xs font-medium cursor-pointer hover:underline" style={{color:GOLD}}>{row.action}</td>
+                  <td className="px-4 py-3"><button onClick={() => handleDeepResearch(row)} disabled={researching === row.id} className="flex items-center gap-1 text-xs text-[#9B958F] hover:text-[#1E2761] transition disabled:opacity-50" title="Deep Research">{researching === row.id ? <RefreshCw size={11} className="animate-spin" /> : <Microscope size={11} />}</button></td>
                 </tr>
               ))}
             </tbody>
@@ -413,6 +563,24 @@ export default function SignalsPage() {
           onSave={sig => { addSignal(sig); setShowAddModal(false); }}
           onClose={() => setShowAddModal(false)}
         />
+      )}
+
+      {researchReport && (
+        <ResearchModal
+          report={researchReport}
+          onClose={() => { setResearchReport(null); setResearchError(null); }}
+        />
+      )}
+
+      {researchError && !researchReport && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl shadow-lg text-xs text-red-700 max-w-sm">
+          <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold mb-0.5">Deep Research Error</p>
+            {researchError}
+          </div>
+          <button onClick={() => setResearchError(null)} className="ml-2 text-red-400 hover:text-red-600"><X size={12} /></button>
+        </div>
       )}
     </div>
   );

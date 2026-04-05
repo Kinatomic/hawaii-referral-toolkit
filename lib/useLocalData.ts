@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { pipelineData as SAMPLE_PIPELINE, leadsData as SAMPLE_LEADS, liquidityEvents as SAMPLE_LIQ, agentActivity as SAMPLE_AGENTS, marketMovements as SAMPLE_MKT, privacySeekers as SAMPLE_PRIV, outreachQueue as SAMPLE_QUEUE } from "./data";
+import type { SourceType } from "./scrapers";
 
 export type PipelineRow = typeof SAMPLE_PIPELINE[0];
 export type Lead = typeof SAMPLE_LEADS[0];
@@ -59,11 +60,14 @@ export interface Signal {
   relevance?: string;
   score?: number;
   fitScore?: number;
+  ai_score?: number;
   property?: string;
   price?: string;
   market?: string;
   inNetwork?: boolean;
   source?: string;
+  source_type?: SourceType;
+  source_url?: string;
   detail?: string;
   type?: string;
   priority: string;
@@ -94,7 +98,15 @@ export function useSignals() {
   const clearDemo = () => save(signals.filter(s => !s.isDemo));
   const clearAll = () => save([]);
 
-  return { signals, addSignal, clearDemo, clearAll };
+  const mergeScraperSignals = (incoming: Omit<Signal, "id" | "isDemo">[]) => {
+    const existingKeys = new Set(signals.map(s => `${s.date}|${(s.signal ?? "").slice(0, 40)}|${s.source_type ?? ""}`));
+    const deduped = incoming.filter(s => !existingKeys.has(`${s.date}|${(s.signal ?? "").slice(0, 40)}|${s.source_type ?? ""}`));
+    if (deduped.length === 0) return 0;
+    save([...deduped.map(s => ({ ...s, id: Date.now() + Math.random(), isDemo: false })), ...signals]);
+    return deduped.length;
+  };
+
+  return { signals, addSignal, clearDemo, clearAll, mergeScraperSignals };
 }
 
 // ── Outreach History ──────────────────────────────────────────────────────────
