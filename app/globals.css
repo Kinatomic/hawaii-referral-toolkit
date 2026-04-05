@@ -1,23 +1,150 @@
 @import "tailwindcss";
 
 :root {
-  --navy: #1E2761;
-  --gold: #C9A96E;
-  --ice-blue: #CADCFC;
-  --bg-dark: #0f1117;
-  --bg-card: #1a1f2e;
-  --bg-card-hover: #212840;
-  --border: #2a3050;
-  --text-muted: #8b95b0;
+  /* Backgrounds */
+  --bg-white:   #FFFFFF;
+  --bg-warm:    #FAFAF8;
+  --bg-subtle:  #F5F3EF;
+  --bg-muted:   #EDE8E0;
+
+  /* Borders */
+  --border-light: #F0EBE3;
+  --border:       #E0D8CC;
+  --border-dark:  #C9BFB2;
+
+  /* Text */
+  --text-primary:   #1A1615;
+  --text-secondary: #5A534E;
+  --text-muted:     #9B958F;
+  --text-light:     #C2B9B0;
+
+  /* Brand */
+  --gold:      #C9A96E;
+  --gold-dark: #B8924A;
+  --gold-light: #F0E4CC;
+  --navy:      #1E2761;
+  --navy-mid:  #2D3A8C;
+  --navy-light: #EEF0FA;
 }
+
+html { font-family: -apple-system, BlinkMacSystemFont, "Geist", "Inter", "Segoe UI", system-ui, sans-serif; }
 
 body {
-  background-color: var(--bg-dark);
-  color: #e8ecf4;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  background-color: var(--bg-warm);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-dark); }
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-warm); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3a4570; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-dark); }
+
+/* Card */
+.card {
+  background: #FFFFFF;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.card-hover:hover {
+  border-color: var(--border);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.07);
+}
+
+/* Priority badges */
+.badge-hot  { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+.badge-warm { background: #FFF7ED; color: #C2410C; border: 1px solid #FED7AA; }
+.badge-cool { background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; }
+
+/* Gold gradient text */
+.text-gold { color: var(--gold); }
+.text-navy { color: var(--navy); }
+
+/* Input base */
+.input-base {
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  padding: 8px 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  width: 100%;
+}
+.input-base:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201,169,110,0.12);
+}
+.input-base::placeholder { color: var(--text-muted); }
+
+/* Toggle switch */
+.toggle-root {
+  position: relative; display: inline-flex; align-items: center;
+  width: 40px; height: 22px; cursor: pointer;
+}
+.toggle-root input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0;
+  background: var(--border-dark); border-radius: 11px;
+  transition: background 0.2s;
+}
+.toggle-root input:checked + .toggle-track { background: var(--gold); }
+.toggle-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: white; transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle-root input:checked ~ .toggle-thumb { transform: translateX(18px); }
+
+/* Button variants */
+.btn-primary {
+  background: var(--navy);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  letter-spacing: 0.01em;
+}
+.btn-primary:hover { background: var(--navy-mid); }
+.btn-primary:active { transform: scale(0.98); }
+
+.btn-gold {
+  background: var(--gold);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.btn-gold:hover { background: var(--gold-dark); }
+.btn-gold:active { transform: scale(0.98); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.btn-outline:hover {
+  border-color: var(--border-dark);
+  color: var(--text-primary);
+  background: var(--bg-subtle);
+}
