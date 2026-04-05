@@ -2,13 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/scrub",
-      "schedule": "0 6 * * 0",
-      "description": "Weekly full intelligence scrub (Sunday 6am UTC) — SEC EDGAR, News, County Records"
+      "schedule": "0 6 * * 0"
     },
     {
       "path": "/api/cron/scrub",
-      "schedule": "0 6 * * 1-5",
-      "description": "Daily news scrub (weekdays 6am UTC)"
+      "schedule": "0 6 * * 1-5"
     }
   ]
 }
