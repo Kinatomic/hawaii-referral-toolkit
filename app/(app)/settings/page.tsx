@@ -27,8 +27,7 @@ interface AppSettings {
   mlsKey: string;
   // Scrapers
   newsApiKey: string;
-  zillowApiKey: string;
-  proxycurlApiKey: string;
+  rapidApiKey: string;
   minTransactionThreshold: number;
   targetMarkets: string[];
   scrubFrequency: "daily" | "weekly" | "manual";
@@ -56,8 +55,7 @@ const DEFAULTS: AppSettings = {
   zillowKey: "",
   mlsKey: "",
   newsApiKey: "",
-  zillowApiKey: "",
-  proxycurlApiKey: "",
+  rapidApiKey: "",
   minTransactionThreshold: 10_000_000,
   targetMarkets: ["Los Angeles", "New York", "San Francisco", "Aspen", "Miami"],
   scrubFrequency: "weekly",
@@ -289,11 +287,8 @@ export default function SettingsPage() {
               <FieldRow label="NewsAPI.org key" hint="Daily news monitoring — free tier (100 req/day). Get key at newsapi.org">
                 <MaskedInput value={settings.newsApiKey} onChange={v => set("newsApiKey", v)} placeholder="news-api-••••••••" />
               </FieldRow>
-              <FieldRow label="Zillow / RapidAPI key" hint="$10M+ MLS closing data across target markets. Get key at rapidapi.com/apimaker/api/zillow56">
-                <MaskedInput value={settings.zillowApiKey} onChange={v => set("zillowApiKey", v)} placeholder="rapidapi-••••••••" />
-              </FieldRow>
-              <FieldRow label="Proxycurl key" hint="LinkedIn agent monitoring — $0.01/profile. Get key at nubela.co/proxycurl">
-                <MaskedInput value={settings.proxycurlApiKey} onChange={v => set("proxycurlApiKey", v)} placeholder="proxycurl-••••••••" />
+              <FieldRow label="RapidAPI key" hint="One key powers both Zillow MLS data and LinkedIn agent monitoring. Get key at rapidapi.com">
+                <MaskedInput value={settings.rapidApiKey} onChange={v => set("rapidApiKey", v)} placeholder="rapidapi-••••••••" />
               </FieldRow>
             </div>
 

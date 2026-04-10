@@ -50,12 +50,22 @@ function getSettings() {
   try { return JSON.parse(localStorage.getItem("pip_settings") ?? "null"); } catch { return null; }
 }
 
-function SourceCard({ status, running }: { status: SourceStatus; running: boolean }) {
+const SOURCE_NEEDS_KEY: Record<string, "rapidApiKey" | "newsApiKey" | null> = {
+  sec: null,
+  news: "newsApiKey",
+  mls: "rapidApiKey",
+  linkedin: "rapidApiKey",
+  county: null,
+};
+
+function SourceCard({ status, running, settings }: { status: SourceStatus; running: boolean; settings: Record<string, string> | null }) {
   const Icon = SOURCE_ICONS[status.source] ?? Database;
   const freshnessClass = FRESHNESS_COLORS[status.freshness];
   const daysAgo = status.last_run
     ? Math.round((Date.now() - new Date(status.last_run).getTime()) / 86400000)
     : null;
+  const requiredKey = SOURCE_NEEDS_KEY[status.source];
+  const keyConfigured = requiredKey === null || !!(settings?.[requiredKey]);
 
   return (
     <div className="card p-4">
@@ -67,9 +77,12 @@ function SourceCard({ status, running }: { status: SourceStatus; running: boolea
           {running ? "Running…" : FRESHNESS_LABELS[status.freshness]}
         </span>
       </div>
-      <p className="text-sm font-semibold text-[#1A1615] capitalize">{status.source}</p>
+      <p className="text-sm font-semibold text-[#1A1615] capitalize">{status.source === "mls" ? "MLS/Zillow" : status.source}</p>
       <p className="text-xs text-[#9B958F] mt-0.5">
         {daysAgo !== null ? `${daysAgo}d ago · ${status.signals_found ?? 0} signals` : "No runs recorded"}
+      </p>
+      <p className={`text-[10px] mt-1.5 font-medium ${keyConfigured ? "text-emerald-600" : "text-[#C2B9B0]"}`}>
+        {requiredKey === null ? "Free — no key needed" : keyConfigured ? "API key configured" : "No API key set"}
       </p>
     </div>
   );
@@ -85,12 +98,14 @@ export default function IntelligencePage() {
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [lastScrubAt, setLastScrubAt] = useState<string | null>(null);
+  const [pageSettings, setPageSettings] = useState<Record<string, string> | null>(null);
 
   useEffect(() => {
     fetch("/api/scraper-status")
       .then(r => r.json())
       .then(d => setStatuses(d.statuses ?? []))
       .catch(() => {});
+    setPageSettings(getSettings());
   }, []);
 
   // ── Signal stats ──────────────────────────────────────────────────────────
@@ -124,20 +139,25 @@ export default function IntelligencePage() {
   const warmCount = allSignals.filter(s => s.priority === "warm").length;
 
   // ── Run full scrub ────────────────────────────────────────────────────────
-  const handleRunScrub = async (sources?: string[]) => {
+  const handleRunScrub = async (sourcesOverride?: string[]) => {
     setScrubbing(true);
     setScrubResult(null);
     const settings = getSettings();
+    const hasRapidKey = !!(settings?.rapidApiKey);
+    // Default: run all sources that have keys configured
+    const defaultSources = hasRapidKey
+      ? ["sec", "news", "zillow", "linkedin", "county"]
+      : ["sec", "news", "county"];
+    const sources = sourcesOverride ?? defaultSources;
 
     try {
       const res = await fetch("/api/cron/scrub", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sources: sources ?? ["sec", "news", "county"],
+          sources,
           newsApiKey: settings?.newsApiKey,
-          zillowApiKey: settings?.zillowApiKey,
-          proxycurlApiKey: settings?.proxycurlApiKey,
+          rapidApiKey: settings?.rapidApiKey,
           minPrice: settings?.minTransactionThreshold ?? 10_000_000,
           lookbackDays: 7,
         }),
@@ -154,12 +174,22 @@ export default function IntelligencePage() {
         new: added,
       });
 
-      // Refresh statuses
-      fetch("/api/scraper-status")
-        .then(r => r.json())
-        .then(d => setStatuses(d.statuses ?? []))
-        .catch(() => {});
-    } catch (e) {
+      // Update source statuses from scrub response (works without Supabase)
+      if (data.summary?.runs) {
+        const updatedStatuses: SourceStatus[] = (data.summary.runs as Array<{ source: string; status: string; signals: number; timestamp?: string; error?: string }>).map(r => ({
+          source: r.source,
+          last_run: r.timestamp ?? now,
+          signals_found: r.signals,
+          status: r.status as "success" | "error" | "partial",
+          freshness: "fresh" as const,
+        }));
+        setStatuses(prev => {
+          const map = new Map(prev.map(s => [s.source, s]));
+          updatedStatuses.forEach(s => map.set(s.source, s));
+          return Array.from(map.values());
+        });
+      }
+    } catch {
       setScrubResult({ total: 0, hot: 0, new: 0 });
     } finally {
       setScrubbing(false);
@@ -282,7 +312,7 @@ export default function IntelligencePage() {
         <div className="grid grid-cols-5 gap-3">
           {(["sec", "news", "mls", "linkedin", "county"] as const).map(src => {
             const status = statuses.find(s => s.source === src) ?? { source: src, freshness: "never" as const };
-            return <SourceCard key={src} status={status} running={scrubbing && scrubbingSource === src} />;
+            return <SourceCard key={src} status={status} running={scrubbing && scrubbingSource === src} settings={pageSettings} />;
           })}
         </div>
       </div>
