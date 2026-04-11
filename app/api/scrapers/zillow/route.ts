@@ -1,62 +1,70 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ScraperResult, ScraperSignal, scoreSignal } from "@/lib/scrapers";
 
-// Zillow / Bridge Interactive MLS API via RapidAPI
-// Primary: RapidAPI Zillow56 (https://rapidapi.com/apimaker/api/zillow56)
-// Alternative: Bridge Interactive MLS API (bridgeinteractive.com)
-
 const RAPIDAPI_HOST = "zillow56.p.rapidapi.com";
 
 const TARGET_MARKETS = [
-  { city: "Beverly Hills", state: "CA", zip: "90210" },
-  { city: "New York", state: "NY", zip: "10021" },
-  { city: "San Francisco", state: "CA", zip: "94115" },
-  { city: "Aspen", state: "CO", zip: "81611" },
-  { city: "Miami", state: "FL", zip: "33139" },
+  { city: "Beverly Hills", state: "CA" },
+  { city: "New York",      state: "NY" },
+  { city: "San Francisco", state: "CA" },
+  { city: "Aspen",         state: "CO" },
+  { city: "Miami",         state: "FL" },
 ];
 
-interface ZillowProperty {
-  zpid?: string;
-  address?: string | { streetAddress?: string; city?: string; state?: string };
-  price?: number;
-  listPrice?: number;
-  soldPrice?: number;
-  soldDate?: string;
-  listingAgent?: { name?: string; company?: string };
-  buyerAgent?: { name?: string; company?: string };
-  propertyType?: string;
-  bedrooms?: number;
-  bathrooms?: number;
-  livingArea?: number;
-  url?: string;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyObj = Record<string, any>;
+
+function extractListings(data: AnyObj): AnyObj[] {
+  for (const key of ["results", "props", "searchResults", "listings", "homes", "data"]) {
+    if (Array.isArray(data[key]) && data[key].length > 0) return data[key] as AnyObj[];
+  }
+  if (Array.isArray(data)) return data as AnyObj[];
+  return [];
 }
 
-function toSignal(prop: ZillowProperty, market: string): ScraperSignal {
-  const price = prop.soldPrice ?? prop.listPrice ?? prop.price ?? 0;
-  const priceStr = price >= 1_000_000 ? `$${(price / 1_000_000).toFixed(1)}M` : `$${price.toLocaleString()}`;
-  const address = typeof prop.address === "string"
-    ? prop.address
-    : `${prop.address?.streetAddress ?? ""}, ${prop.address?.city ?? market}`;
-  const agentName = prop.listingAgent?.name ?? prop.buyerAgent?.name;
-  const brokerage = prop.listingAgent?.company ?? prop.buyerAgent?.company;
+function extractPrice(p: AnyObj): number {
+  return (
+    p.soldPrice ?? p.lastSoldPrice ?? p.price ?? p.listPrice ??
+    p.unformattedPrice ?? p.hdpData?.homeInfo?.price ??
+    p.hdpData?.homeInfo?.soldPrice ?? 0
+  );
+}
 
-  const signal: ScraperSignal = {
-    date: prop.soldDate ?? new Date().toISOString().split("T")[0],
-    signal: `${priceStr} sale — ${address}`,
-    property: address,
-    price: priceStr,
-    market,
-    tab: "market",
-    source_type: "mls",
-    source_url: prop.url,
-    action: "Contact listing agent",
-    priority: "warm",
-    ...(agentName && { agent: agentName }),
-    ...(brokerage && { brokerage }),
-    raw_data: { zpid: prop.zpid, price, propertyType: prop.propertyType },
+function extractAddress(p: AnyObj, marketFallback: string): string {
+  const a = p.address ?? p.streetAddress ?? p.hdpData?.homeInfo?.streetAddress;
+  if (typeof a === "string" && a.trim()) return a.trim();
+  if (a && typeof a === "object") {
+    const parts = [a.streetAddress, a.city, a.state, a.zipcode].filter(Boolean);
+    if (parts.length) return parts.join(", ");
+  }
+  const street = p.streetAddress ?? p.street ?? "";
+  const city   = p.city ?? "";
+  const state  = p.state ?? "";
+  if (street) return [street, city, state].filter(Boolean).join(", ");
+  return marketFallback;
+}
+
+function extractDate(p: AnyObj): string {
+  const raw = p.soldDate ?? p.dateSold ?? p.lastSoldDate ?? p.listedDate ?? p.listingDate;
+  if (!raw) return new Date().toISOString().split("T")[0];
+  if (typeof raw === "number") return new Date(raw).toISOString().split("T")[0];
+  return String(raw).split("T")[0];
+}
+
+function extractAgentBrokerage(p: AnyObj): { agent?: string; brokerage?: string } {
+  const agentName =
+    p.listingAgent?.name ?? p.listingAgent?.displayName ??
+    p.agentName ?? p.agent?.name ?? p.brokerName ??
+    p.attribution?.agentName ?? p.hdpData?.homeInfo?.agentName ??
+    p.buyerAgent?.name;
+  const brokerageName =
+    p.listingAgent?.company ?? p.listingAgent?.businessName ??
+    p.brokerage ?? p.brokerageName ?? p.attribution?.brokerName ??
+    p.hdpData?.homeInfo?.brokerName ?? p.buyerAgent?.company;
+  return {
+    ...(agentName     ? { agent:     String(agentName)     } : {}),
+    ...(brokerageName ? { brokerage: String(brokerageName) } : {}),
   };
-  signal.priority = scoreSignal(signal);
-  return signal;
 }
 
 export async function POST(request: NextRequest) {
@@ -84,15 +92,10 @@ export async function POST(request: NextRequest) {
 
   for (const market of TARGET_MARKETS) {
     try {
-      // Search recently sold luxury properties via RapidAPI Zillow
+      const location = `${market.city}, ${market.state}`;
       const res = await fetch(
-        `https://${RAPIDAPI_HOST}/search?location=${encodeURIComponent(`${market.city}, ${market.state}`)}&status_type=RecentlySold&sort=Newest&price_min=${minPrice}`,
-        {
-          headers: {
-            "X-RapidAPI-Key": apiKey,
-            "X-RapidAPI-Host": RAPIDAPI_HOST,
-          },
-        }
+        `https://${RAPIDAPI_HOST}/search?location=${encodeURIComponent(location)}&status_type=RecentlySold&sort=Newest&price_min=${minPrice}`,
+        { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": RAPIDAPI_HOST } }
       );
 
       if (!res.ok) {
@@ -100,13 +103,39 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const data = await res.json();
-      const props: ZillowProperty[] = data.props ?? data.results ?? data.searchResults ?? [];
+      const data: AnyObj = await res.json();
+      const listings = extractListings(data);
 
-      for (const prop of props.slice(0, 5)) {
-        const price = prop.soldPrice ?? prop.listPrice ?? prop.price ?? 0;
-        if (price < minPrice) continue;
-        signals.push(toSignal(prop, `${market.city}, ${market.state}`));
+      if (listings.length === 0) {
+        errors.push(`Zillow ${market.city}: 0 listings — top-level keys: [${Object.keys(data).join(", ")}]`);
+        continue;
+      }
+
+      for (const prop of listings.slice(0, 5)) {
+        const priceRaw = extractPrice(prop);
+        const priceStr = priceRaw >= 1_000_000
+          ? `$${(priceRaw / 1_000_000).toFixed(1)}M`
+          : priceRaw > 0 ? `$${priceRaw.toLocaleString()}` : "";
+        const address = extractAddress(prop, location);
+        const { agent, brokerage } = extractAgentBrokerage(prop);
+
+        const signal: ScraperSignal = {
+          date: extractDate(prop),
+          signal: priceStr ? `${priceStr} sale — ${address}` : `Recent sale — ${address}`,
+          property: address,
+          price: priceStr || undefined,
+          market: location,
+          tab: "market",
+          source_type: "mls",
+          source_url: prop.url ?? prop.detailUrl ?? prop.hdpUrl,
+          action: "Contact listing agent",
+          priority: "warm",
+          ...(agent     && { agent }),
+          ...(brokerage && { brokerage }),
+          raw_data: { ...prop }, // full object stored for field inspection
+        };
+        signal.priority = scoreSignal(signal);
+        signals.push(signal);
       }
     } catch (e) {
       errors.push(`${market.city}: ${e instanceof Error ? e.message : String(e)}`);
