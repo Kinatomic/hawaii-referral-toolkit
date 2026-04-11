@@ -153,7 +153,11 @@ export default function SettingsPage() {
   }, []);
 
   const set = <K extends keyof AppSettings>(key: K, val: AppSettings[K]) =>
-    setSettings(s => ({ ...s, [key]: val }));
+    setSettings(s => {
+      const next = { ...s, [key]: val };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+      return next;
+    });
 
   const handleSave = () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));

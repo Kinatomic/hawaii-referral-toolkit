@@ -62,7 +62,7 @@ function toSignal(prop: ZillowProperty, market: string): ScraperSignal {
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   const body = await request.json().catch(() => ({}));
-  const apiKey: string | undefined = body.zillowApiKey ?? process.env.ZILLOW_RAPIDAPI_KEY;
+  const apiKey: string | undefined = body.rapidApiKey ?? body.zillowApiKey ?? process.env.ZILLOW_RAPIDAPI_KEY;
   const minPrice: number = body.minPrice ?? 10_000_000;
 
   if (!apiKey) {
