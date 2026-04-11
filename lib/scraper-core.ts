@@ -154,8 +154,9 @@ export async function scrapeZillow(opts: ZillowOptions): Promise<ScraperResult> 
         { headers: { "X-RapidAPI-Key": opts.apiKey, "X-RapidAPI-Host": ZILLOW_HOST } }
       );
       if (!res.ok) { errors.push(`Zillow ${market}: ${res.status}`); continue; }
-      const data = await res.json() as { props?: Array<{ zpid?: string; address?: string | { streetAddress?: string; city?: string }; soldPrice?: number; listPrice?: number; price?: number; soldDate?: string; listingAgent?: { name?: string; company?: string }; propertyType?: string }> };
-      const props = data.props ?? [];
+      type ZillowProp = { zpid?: string; address?: string | { streetAddress?: string; city?: string }; soldPrice?: number; listPrice?: number; price?: number; soldDate?: string; listingAgent?: { name?: string; company?: string }; propertyType?: string };
+      const data = await res.json() as { props?: ZillowProp[]; results?: ZillowProp[]; searchResults?: ZillowProp[] };
+      const props = data.props ?? data.results ?? data.searchResults ?? [];
       for (const p of props.slice(0, 5)) {
         const price = p.soldPrice ?? p.listPrice ?? p.price ?? 0;
         if (price < minPrice) continue;

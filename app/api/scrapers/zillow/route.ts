@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       }
 
       const data = await res.json();
-      const props: ZillowProperty[] = data.props ?? data.results ?? [];
+      const props: ZillowProperty[] = data.props ?? data.results ?? data.searchResults ?? [];
 
       for (const prop of props.slice(0, 5)) {
         const price = prop.soldPrice ?? prop.listPrice ?? prop.price ?? 0;
