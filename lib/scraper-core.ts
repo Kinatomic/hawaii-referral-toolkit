@@ -154,24 +154,28 @@ function extractListings(data: AnyObj): AnyObj[] {
   return [];
 }
 
-/** Extract sale price — try every field name variant. */
+/** Extract sale price.
+ *  Zillow56 /search returns `price` for both active and recently-sold listings.
+ *  Keep fallbacks for other possible shapes. */
 function extractPrice(p: AnyObj): number {
   return (
-    p.soldPrice ?? p.lastSoldPrice ?? p.price ?? p.listPrice ??
+    p.price ??               // Zillow56 primary field
+    p.soldPrice ?? p.lastSoldPrice ?? p.listPrice ??
     p.unformattedPrice ?? p.hdpData?.homeInfo?.price ??
     p.hdpData?.homeInfo?.soldPrice ?? 0
   );
 }
 
-/** Extract street address as a plain string. */
+/** Extract street address as a plain string.
+ *  Zillow56 returns address as an object: {streetAddress, city, state, zipcode}. */
 function extractAddress(p: AnyObj, marketFallback: string): string {
-  const a = p.address ?? p.streetAddress ?? p.hdpData?.homeInfo?.streetAddress;
-  if (typeof a === "string" && a.trim()) return a.trim();
+  const a = p.address;
   if (a && typeof a === "object") {
-    const parts = [a.streetAddress, a.city, a.state, a.zipcode].filter(Boolean);
+    const parts = [a.streetAddress, a.city, a.state].filter(Boolean);
     if (parts.length) return parts.join(", ");
   }
-  // Flat top-level address fields
+  if (typeof a === "string" && a.trim()) return a.trim();
+  // Flat top-level fields fallback
   const street = p.streetAddress ?? p.street ?? "";
   const city   = p.city ?? "";
   const state  = p.state ?? "";
@@ -179,36 +183,33 @@ function extractAddress(p: AnyObj, marketFallback: string): string {
   return marketFallback;
 }
 
-/** Extract sold/listed date. */
+/** Extract sold/listed date.
+ *  Zillow56 recently-sold results store the date in priceHistory[0].date. */
 function extractDate(p: AnyObj): string {
-  const raw = p.soldDate ?? p.dateSold ?? p.lastSoldDate ?? p.listedDate ?? p.listingDate;
+  // priceHistory is an array of {date, price, event} — first entry is most recent
+  const histDate = Array.isArray(p.priceHistory) && p.priceHistory[0]?.date;
+  const raw = histDate ?? p.soldDate ?? p.dateSold ?? p.lastSoldDate ?? p.listedDate ?? p.listingDate;
   if (!raw) return todayISO();
-  // ISO string or timestamp
   if (typeof raw === "number") return new Date(raw).toISOString().split("T")[0];
   return String(raw).split("T")[0];
 }
 
-/** Extract agent and brokerage from all known response shapes. */
+/** Extract agent and brokerage.
+ *  Zillow56 /search results do NOT include agent info — that requires a /property
+ *  detail call per zpid. Keep the full fallback chain for future-proofing. */
 function extractAgentBrokerage(p: AnyObj): { agent?: string; brokerage?: string } {
   const agentName =
-    p.listingAgent?.name ??
-    p.listingAgent?.displayName ??
-    p.agentName ??
-    p.agent?.name ??
-    p.brokerName ??          // some Zillow56 endpoints return flat brokerName
-    p.attribution?.agentName ??
-    p.hdpData?.homeInfo?.agentName;
+    p.listingAgent?.name ?? p.listingAgent?.displayName ??
+    p.agentName ?? p.agent?.name ?? p.brokerName ??
+    p.attribution?.agentName ?? p.hdpData?.homeInfo?.agentName;
 
   const brokerageName =
-    p.listingAgent?.company ??
-    p.listingAgent?.businessName ??
-    p.brokerage ??
-    p.brokerageName ??
-    p.attribution?.brokerName ??
+    p.listingAgent?.company ?? p.listingAgent?.businessName ??
+    p.brokerage ?? p.brokerageName ?? p.attribution?.brokerName ??
     p.hdpData?.homeInfo?.brokerName;
 
   return {
-    ...(agentName   ? { agent:     String(agentName)     } : {}),
+    ...(agentName     ? { agent:     String(agentName)     } : {}),
     ...(brokerageName ? { brokerage: String(brokerageName) } : {}),
   };
 }
@@ -223,7 +224,7 @@ export async function scrapeZillow(opts: ZillowOptions): Promise<ScraperResult> 
   for (const market of LUXURY_MARKETS) {
     try {
       const res = await fetch(
-        `https://${ZILLOW_HOST}/search?location=${encodeURIComponent(market)}&status_type=RecentlySold&sort=Newest&price_min=${minPrice}`,
+        `https://${ZILLOW_HOST}/search?location=${encodeURIComponent(market)}&status=recentlySold&sortSelection=days&price_min=${minPrice}`,
         { headers: { "X-RapidAPI-Key": opts.apiKey, "X-RapidAPI-Host": ZILLOW_HOST } }
       );
       if (!res.ok) { errors.push(`Zillow ${market}: HTTP ${res.status}`); continue; }

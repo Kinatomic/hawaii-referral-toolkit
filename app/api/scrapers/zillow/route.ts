@@ -24,19 +24,20 @@ function extractListings(data: AnyObj): AnyObj[] {
 
 function extractPrice(p: AnyObj): number {
   return (
-    p.soldPrice ?? p.lastSoldPrice ?? p.price ?? p.listPrice ??
+    p.price ??               // Zillow56 primary field for both active and sold
+    p.soldPrice ?? p.lastSoldPrice ?? p.listPrice ??
     p.unformattedPrice ?? p.hdpData?.homeInfo?.price ??
     p.hdpData?.homeInfo?.soldPrice ?? 0
   );
 }
 
 function extractAddress(p: AnyObj, marketFallback: string): string {
-  const a = p.address ?? p.streetAddress ?? p.hdpData?.homeInfo?.streetAddress;
-  if (typeof a === "string" && a.trim()) return a.trim();
+  const a = p.address;
   if (a && typeof a === "object") {
-    const parts = [a.streetAddress, a.city, a.state, a.zipcode].filter(Boolean);
+    const parts = [a.streetAddress, a.city, a.state].filter(Boolean);
     if (parts.length) return parts.join(", ");
   }
+  if (typeof a === "string" && a.trim()) return a.trim();
   const street = p.streetAddress ?? p.street ?? "";
   const city   = p.city ?? "";
   const state  = p.state ?? "";
@@ -45,7 +46,8 @@ function extractAddress(p: AnyObj, marketFallback: string): string {
 }
 
 function extractDate(p: AnyObj): string {
-  const raw = p.soldDate ?? p.dateSold ?? p.lastSoldDate ?? p.listedDate ?? p.listingDate;
+  const histDate = Array.isArray(p.priceHistory) && p.priceHistory[0]?.date;
+  const raw = histDate ?? p.soldDate ?? p.dateSold ?? p.lastSoldDate ?? p.listedDate ?? p.listingDate;
   if (!raw) return new Date().toISOString().split("T")[0];
   if (typeof raw === "number") return new Date(raw).toISOString().split("T")[0];
   return String(raw).split("T")[0];
@@ -94,7 +96,7 @@ export async function POST(request: NextRequest) {
     try {
       const location = `${market.city}, ${market.state}`;
       const res = await fetch(
-        `https://${RAPIDAPI_HOST}/search?location=${encodeURIComponent(location)}&status_type=RecentlySold&sort=Newest&price_min=${minPrice}`,
+        `https://${RAPIDAPI_HOST}/search?location=${encodeURIComponent(location)}&status=recentlySold&sortSelection=days&price_min=${minPrice}`,
         { headers: { "X-RapidAPI-Key": apiKey, "X-RapidAPI-Host": RAPIDAPI_HOST } }
       );
 
